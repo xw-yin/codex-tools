@@ -35,7 +35,13 @@ pub(crate) fn is_macos_codex_app_bundle(path: &Path) -> bool {
     }
 
     // ChatGPT.app 历史上也可能是普通聊天客户端，内置 codex 才能证明它支持当前启动协议。
-    is_executable_file(&path.join("Contents").join("Resources").join("codex"))
+    let resources = path.join("Contents").join("Resources");
+    is_executable_file(&resources.join("codex"))
+        || is_executable_file(&resources.join("codex-cli").join("bin").join("codex"))
+        || is_executable_file(&resources.join("codex-cli").join("CodexCLI.app").join("Contents").join("MacOS").join("codex"))
+        || resources.join("codex-cli").is_dir()
+        || resources.join("com.openai.codex.manifest").exists()
+        || path.join("Contents").join("Frameworks").join("Codex Framework.framework").exists()
 }
 
 #[cfg(target_os = "macos")]
@@ -48,7 +54,10 @@ pub(super) fn append_macos_app_bundle_codex_candidates(candidates: &mut Vec<Path
     }
 
     for app_path in app_paths {
-        candidates.push(app_path.join("Contents").join("Resources").join("codex"));
+        let resources = app_path.join("Contents").join("Resources");
+        candidates.push(resources.join("codex"));
+        candidates.push(resources.join("codex-cli").join("bin").join("codex"));
+        candidates.push(resources.join("codex-cli").join("CodexCLI.app").join("Contents").join("MacOS").join("codex"));
     }
 }
 
@@ -115,6 +124,36 @@ mod tests {
 
         let embedded_codex = chatgpt_app.join("Contents").join("Resources").join("codex");
         fs::write(&embedded_codex, b"test").expect("write embedded codex marker");
+        let mut permissions = fs::metadata(&embedded_codex)
+            .expect("read marker metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&embedded_codex, permissions).expect("make marker executable");
+
+        assert!(is_macos_codex_app_bundle(&chatgpt_app));
+        let _ = fs::remove_dir_all(sandbox);
+    }
+
+    #[test]
+    fn chatgpt_candidate_accepts_modern_codex_cli_bundle() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock should be after unix epoch")
+            .as_nanos();
+        let sandbox = std::env::temp_dir().join(format!(
+            "codex-tools-cli-test-modern-{}-{nonce}",
+            std::process::id()
+        ));
+        let chatgpt_app = sandbox.join("ChatGPT.app");
+        let codex_cli_bin = chatgpt_app
+            .join("Contents")
+            .join("Resources")
+            .join("codex-cli")
+            .join("bin");
+        fs::create_dir_all(&codex_cli_bin).expect("create modern ChatGPT codex-cli bundle");
+
+        let embedded_codex = codex_cli_bin.join("codex");
+        fs::write(&embedded_codex, b"test").expect("write embedded modern codex marker");
         let mut permissions = fs::metadata(&embedded_codex)
             .expect("read marker metadata")
             .permissions();
