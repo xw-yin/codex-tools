@@ -2,6 +2,16 @@
 
 ### Unreleased
 
+- v2.9.1
+
+#### English
+
+1. Fix macOS account switching becoming ineffective after latest Codex desktop updates by recognizing the modern embedded `codex-cli` bundle layout and manifest inside ChatGPT.app.
+
+#### 中文
+
+1. 修复新版 Codex 桌面端更新后导致 macOS 下切换账号无效的问题：兼容 ChatGPT.app 内置的新版 `codex-cli` 与清单文件路径，确保切换账号时能正确识别并关闭旧实例进程树。
+
 - v2.9.0
 
 #### English
